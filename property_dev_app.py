@@ -128,40 +128,58 @@ if st.sidebar.button("🚀 Run Feasibility"):
 
         cashflow_df = pd.DataFrame(cashflow_data)
 
-        # --- Financial Summary ---
-        total_project_cost = cashflow_df['Cumulative Cash Invested ($)'].max()
-        total_sale_value = sale_price_per_unit * number_of_units
-        gross_profit = total_sale_value - total_project_cost
-        roi_total_cost = (gross_profit / total_project_cost) * 100
-        cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100
-        profit_margin = (gross_profit / total_sale_value) * 100
+     # --- Correct Final Financial Summary ---
 
-        if cash_on_cash_roi >= 80:
-            grade, color = "A+", "🟢"
-        elif 60 <= cash_on_cash_roi < 80:
-            grade, color = "A", "🟢"
-        elif 40 <= cash_on_cash_roi < 60:
-            grade, color = "B", "🟡"
-        elif 20 <= cash_on_cash_roi < 40:
-            grade, color = "C", "🟠"
-        elif 0 <= cash_on_cash_roi < 20:
-            grade, color = "D", "🔴"
-        else:
-            grade, color = "F", "🟥"
+# Calculate total project cost (cash invested + loan drawn BEFORE sale happens)
+# Sale proceeds artificially distort cashflow so we ignore the last sale month
+total_project_cost = (
+    cashflow_df["Cumulative Cash Invested ($)"].iloc[-2]
+    + cashflow_df["Loan Balance ($)"].iloc[-2]
+)
 
-        # --- Display ---
-        st.subheader("📊 Feasibility Summary")
-        st.markdown(f"""
-        **Project:** `{project_name or "Unnamed Project"}`  
-        - **Total Sale Value:** ${total_sale_value:,.0f}  
-        - **Total Project Cost:** ${total_project_cost:,.0f}  
-        - **Gross Profit:** ${gross_profit:,.0f}  
-        - **ROI on Total Cost:** `{roi_total_cost:.1f}%`  
-        - **Cash-on-Cash ROI:** `{cash_on_cash_roi:.1f}%`  
-        - **Profit Margin:** `{profit_margin:.1f}%`  
-        - **Peak Cash Invested:** ${peak_cash_invested:,.0f}  
-        - **Deal Grade:** `{grade}` {color}
-        """)
+# Calculate peak cash invested (maximum out-of-pocket cash at any month)
+peak_cash_invested = cashflow_df["Cumulative Cash Invested ($)"].max()
+
+# Total Sale Value
+total_sale_value = sale_price_per_unit * number_of_units
+
+# Gross Profit
+gross_profit = total_sale_value - total_project_cost
+
+# ROI Metrics
+roi_total_cost = (gross_profit / total_project_cost) * 100
+cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100
+profit_margin = (gross_profit / total_sale_value) * 100
+
+# Deal Grading
+if cash_on_cash_roi >= 80:
+    grade, color = "A+", "🟢"
+elif 60 <= cash_on_cash_roi < 80:
+    grade, color = "A", "🟢"
+elif 40 <= cash_on_cash_roi < 60:
+    grade, color = "B", "🟡"
+elif 20 <= cash_on_cash_roi < 40:
+    grade, color = "C", "🟠"
+elif 0 <= cash_on_cash_roi < 20:
+    grade, color = "D", "🔴"
+else:
+    grade, color = "F", "🟥"
+
+# Display Clean Financial Summary
+st.subheader("📊 Feasibility Summary")
+
+st.markdown(f"""
+**Project:** `{project_name or "Unnamed Project"}`  
+- **Total Sale Value:** ${total_sale_value:,.0f}  
+- **Total Project Cost:** ${total_project_cost:,.0f}  
+- **Gross Profit:** ${gross_profit:,.0f}  
+- **ROI on Total Project Cost:** `{roi_total_cost:.1f}%`  
+- **Cash-on-Cash ROI:** `{cash_on_cash_roi:.1f}%`  
+- **Profit Margin:** `{profit_margin:.1f}%`  
+- **Peak Cash Invested:** ${peak_cash_invested:,.0f}  
+- **Deal Grade:** `{grade}` {color}
+""")
+
 
         # --- Graph ---
         st.subheader("📈 Cashflow Overview")
