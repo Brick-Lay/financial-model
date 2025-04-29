@@ -128,76 +128,75 @@ if st.sidebar.button("🚀 Run Feasibility"):
 
         cashflow_df = pd.DataFrame(cashflow_data)
 
-     # --- Correct Final Financial Summary ---
+        # --- Correct Final Financial Summary ---
 
-# Calculate total project cost (cash invested + loan drawn BEFORE sale happens)
-# Sale proceeds artificially distort cashflow so we ignore the last sale month
-total_project_cost = (
-    cashflow_df["Cumulative Cash Invested ($)"].iloc[-2]
-    + cashflow_df["Loan Balance ($)"].iloc[-2]
-)
+    # Calculate total project cost (cash invested + loan drawn BEFORE sale happens)
+    # Sale proceeds artificially distort cashflow so we ignore the last sale month
+    total_project_cost = (
+        cashflow_df["Cumulative Cash Invested ($)"].iloc[-2]
+        + cashflow_df["Loan Balance ($)"].iloc[-2]
+    )
 
-# Calculate peak cash invested (maximum out-of-pocket cash at any month)
-peak_cash_invested = cashflow_df["Cumulative Cash Invested ($)"].max()
+    # Calculate peak cash invested (maximum out-of-pocket cash at any month)
+    peak_cash_invested = cashflow_df["Cumulative Cash Invested ($)"].max()
 
-# Total Sale Value
-total_sale_value = sale_price_per_unit * number_of_units
+    # Total Sale Value
+    total_sale_value = sale_price_per_unit * number_of_units
 
-# Gross Profit
-gross_profit = total_sale_value - total_project_cost
+    # Gross Profit
+    gross_profit = total_sale_value - total_project_cost
 
-# ROI Metrics
-roi_total_cost = (gross_profit / total_project_cost) * 100
-cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100
-profit_margin = (gross_profit / total_sale_value) * 100
+    # ROI Metrics
+    roi_total_cost = (gross_profit / total_project_cost) * 100
+    cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100
+    profit_margin = (gross_profit / total_sale_value) * 100
 
-# Deal Grading
-if cash_on_cash_roi >= 80:
-    grade, color = "A+", "🟢"
-elif 60 <= cash_on_cash_roi < 80:
-    grade, color = "A", "🟢"
-elif 40 <= cash_on_cash_roi < 60:
-    grade, color = "B", "🟡"
-elif 20 <= cash_on_cash_roi < 40:
-    grade, color = "C", "🟠"
-elif 0 <= cash_on_cash_roi < 20:
-    grade, color = "D", "🔴"
-else:
-    grade, color = "F", "🟥"
+    # Deal Grading
+    if cash_on_cash_roi >= 80:
+        grade, color = "A+", "🟢"
+    elif 60 <= cash_on_cash_roi < 80:
+        grade, color = "A", "🟢"
+    elif 40 <= cash_on_cash_roi < 60:
+        grade, color = "B", "🟡"
+    elif 20 <= cash_on_cash_roi < 40:
+        grade, color = "C", "🟠"
+    elif 0 <= cash_on_cash_roi < 20:
+        grade, color = "D", "🔴"
+    else:
+        grade, color = "F", "🟥"
 
-# Display Clean Financial Summary
-st.subheader("📊 Feasibility Summary")
+    # Display Clean Financial Summary
+    st.subheader("📊 Feasibility Summary")
 
-st.markdown(f"""
-**Project:** `{project_name or "Unnamed Project"}`  
-- **Total Sale Value:** ${total_sale_value:,.0f}  
-- **Total Project Cost:** ${total_project_cost:,.0f}  
-- **Gross Profit:** ${gross_profit:,.0f}  
-- **ROI on Total Project Cost:** `{roi_total_cost:.1f}%`  
-- **Cash-on-Cash ROI:** `{cash_on_cash_roi:.1f}%`  
-- **Profit Margin:** `{profit_margin:.1f}%`  
-- **Peak Cash Invested:** ${peak_cash_invested:,.0f}  
-- **Deal Grade:** `{grade}` {color}
-""")
+    st.markdown(f"""
+    **Project:** `{project_name or "Unnamed Project"}`  
+    - **Total Sale Value:** ${total_sale_value:,.0f}  
+    - **Total Project Cost:** ${total_project_cost:,.0f}  
+    - **Gross Profit:** ${gross_profit:,.0f}  
+    - **ROI on Total Project Cost:** `{roi_total_cost:.1f}%`  
+    - **Cash-on-Cash ROI:** `{cash_on_cash_roi:.1f}%`  
+    - **Profit Margin:** `{profit_margin:.1f}%`  
+    - **Peak Cash Invested:** ${peak_cash_invested:,.0f}  
+    - **Deal Grade:** `{grade}` {color}
+    """)
 
+            # --- Graph ---
+            st.subheader("📈 Cashflow Overview")
+            fig, ax = plt.subplots(figsize=(14,7))
+            ax.plot(cashflow_df['Month Name'], cashflow_df['Cumulative Cash Invested ($)'], label='Cumulative Cash Invested', marker='o')
+            ax.plot(cashflow_df['Month Name'], cashflow_df['Loan Balance ($)'], label='Loan Balance', marker='x')
+            ax.plot(cashflow_df['Month Name'], cashflow_df['Net Cash Position ($)'], label='Net Cash Position', linestyle='--', color='purple')
+            ax.set_xlabel("Month")
+            ax.set_ylabel("Amount ($)")
+            ax.set_title("Cashflow, Loan Balance and Net Exposure Timeline")
+            ax.legend()
+            ax.grid(True)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            for label in ax.xaxis.get_ticklabels()[::2]:
+                label.set_visible(False)
+            st.pyplot(fig)
 
-        # --- Graph ---
-        st.subheader("📈 Cashflow Overview")
-        fig, ax = plt.subplots(figsize=(14,7))
-        ax.plot(cashflow_df['Month Name'], cashflow_df['Cumulative Cash Invested ($)'], label='Cumulative Cash Invested', marker='o')
-        ax.plot(cashflow_df['Month Name'], cashflow_df['Loan Balance ($)'], label='Loan Balance', marker='x')
-        ax.plot(cashflow_df['Month Name'], cashflow_df['Net Cash Position ($)'], label='Net Cash Position', linestyle='--', color='purple')
-        ax.set_xlabel("Month")
-        ax.set_ylabel("Amount ($)")
-        ax.set_title("Cashflow, Loan Balance and Net Exposure Timeline")
-        ax.legend()
-        ax.grid(True)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        for label in ax.xaxis.get_ticklabels()[::2]:
-            label.set_visible(False)
-        st.pyplot(fig)
-
-        # --- Download CSV ---
-        csv = cashflow_df.to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Download Full Cashflow CSV", data=csv, file_name=f"{project_name or 'project'}_cashflow.csv", mime="text/csv")
+            # --- Download CSV ---
+            csv = cashflow_df.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Download Full Cashflow CSV", data=csv, file_name=f"{project_name or 'project'}_cashflow.csv", mime="text/csv")
