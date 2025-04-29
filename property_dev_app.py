@@ -1,4 +1,4 @@
-# Property Development Feasibility App - Final Version
+# Property Development Feasibility App - Full Final Version
 
 import streamlit as st
 import pandas as pd
@@ -13,31 +13,26 @@ st.title("🏗️ Property Development Feasibility App")
 st.sidebar.header("Project Settings")
 project_name = st.sidebar.text_input("Project Name", value="")
 
-# --- Land and Sale Inputs ---
 st.sidebar.header("Land & Sale Details")
 land_purchase_price = st.sidebar.number_input("Land Purchase Price ($)", value=0)
 sale_price_per_unit = st.sidebar.number_input("Sale Price per Unit ($)", value=750000)
 number_of_units = st.sidebar.number_input("Number of Units to Sell", value=2)
 
-# --- Construction Inputs ---
 st.sidebar.header("Construction Inputs")
 construction_size_m2 = st.sidebar.number_input("Construction Size (m²)", value=200)
 construction_cost_per_m2 = st.sidebar.number_input("Construction Cost per m² ($)", value=2000)
 
-# --- Finance Inputs ---
 st.sidebar.header("Finance Settings")
 land_loan_lvr = st.sidebar.slider("Land Loan to Value Ratio (LVR)", 0.0, 1.0, 0.7)
 annual_interest_rate = st.sidebar.number_input("Annual Interest Rate (%)", value=6.5) / 100
 loan_term_years = st.sidebar.number_input("Loan Term (Years)", value=30)
 deposit_percentage = st.sidebar.slider("Deposit Percentage (%)", 0.0, 1.0, 0.1)
 
-# --- Timeline Inputs ---
 st.sidebar.header("Timeline Controls")
 months_until_settlement = st.sidebar.number_input("Months Until Settlement", value=3)
 months_until_construction_start = st.sidebar.number_input("Months Until Construction Start after Settlement", value=3)
 construction_duration_months = st.sidebar.number_input("Construction Duration (Months)", value=9)
 
-# --- Advanced Settings ---
 with st.sidebar.expander("⚙️ Advanced Settings"):
     st.subheader("Soft Costs")
     stamp_duty = st.number_input("Stamp Duty ($)", value=0)
@@ -61,19 +56,13 @@ with st.sidebar.expander("⚙️ Advanced Settings"):
     working_drawings = st.number_input("Working Drawings ($)", value=6000)
     consultants_cost = st.number_input("Consultants Cost ($)", value=8000)
 
-# --- Validation Checks ---
-if land_purchase_price <= 0:
-    st.warning("⚠️ Please enter a valid Land Purchase Price.")
-elif number_of_units <= 0:
-    st.warning("⚠️ Please enter a valid number of units.")
-elif sale_price_per_unit <= 0:
-    st.warning("⚠️ Please enter a valid Sale Price per Unit.")
-elif construction_size_m2 <= 0:
-    st.warning("⚠️ Please enter a valid Construction Size in m².")
-else:
-    # --- Run Button ---
-    if st.sidebar.button("🚀 Run Feasibility"):
-        
+# --- Run Button ---
+if st.sidebar.button("🚀 Run Feasibility"):
+
+    # --- Validation Checks ---
+    if land_purchase_price <= 0 or number_of_units <= 0 or sale_price_per_unit <= 0 or construction_size_m2 <= 0:
+        st.warning("⚠️ Please enter valid key inputs.")
+    else:
         # --- Calculations Start ---
         construction_cost_total = construction_size_m2 * construction_cost_per_m2
 
@@ -139,7 +128,7 @@ else:
 
         cashflow_df = pd.DataFrame(cashflow_data)
 
-        # --- Final Financial Summary ---
+        # --- Financial Summary ---
         total_project_cost = cashflow_df['Cumulative Cash Invested ($)'].max()
         total_sale_value = sale_price_per_unit * number_of_units
         gross_profit = total_sale_value - total_project_cost
@@ -147,7 +136,6 @@ else:
         cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100
         profit_margin = (gross_profit / total_sale_value) * 100
 
-        # --- Deal Grading ---
         if cash_on_cash_roi >= 80:
             grade, color = "A+", "🟢"
         elif 60 <= cash_on_cash_roi < 80:
@@ -161,7 +149,7 @@ else:
         else:
             grade, color = "F", "🟥"
 
-        # --- Display Financial Summary ---
+        # --- Display ---
         st.subheader("📊 Feasibility Summary")
         st.markdown(f"""
         **Project:** `{project_name or "Unnamed Project"}`  
