@@ -1,4 +1,4 @@
-# Property Development Financial Model - Streamlit App Version (Grouped Sidebar)
+# Property Development Financial Model - Streamlit App Version (Grouped Sidebar with Grading, Advanced Settings, and Project Name)
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,15 +10,30 @@ from dateutil.relativedelta import relativedelta
 st.title("🏗️ Property Development Feasibility App")
 st.sidebar.header("Project Inputs")
 
-# --- Grouped Sidebar Inputs ---
-with st.sidebar.expander("🏠 Land and Purchase Details"):
-    land_purchase_price = st.number_input("Land Purchase Price ($)", value=1131000)
+# --- Basic Sidebar Inputs ---
+project_name = st.sidebar.text_input("Project Name", value="My Project")
+land_purchase_price = st.sidebar.number_input("Land Purchase Price ($)", value=1131000)
+construction_size_m2 = st.sidebar.number_input("Construction Size (m²)", value=300)
+construction_cost_per_m2 = st.sidebar.number_input("Construction Cost per m² ($)", value=2000)
+sale_price_per_unit = st.sidebar.number_input("Sale Price per Unit ($)", value=750000)
+number_of_units = st.sidebar.number_input("Number of Units to Sell", value=2)
+
+# --- Finance Inputs ---
+land_loan_lvr = st.sidebar.slider("Loan to Value Ratio (LVR)", min_value=0.0, max_value=1.0, value=0.80)
+annual_interest_rate = st.sidebar.number_input("Annual Interest Rate (%)", value=7.84) / 100
+loan_term_years = st.sidebar.number_input("Loan Term (Years)", value=30)
+
+deposit_percentage = st.sidebar.slider("Deposit Percentage (%)", min_value=0.0, max_value=1.0, value=0.05)
+
+# --- Timeline Inputs ---
+months_until_settlement = st.sidebar.number_input("Months Until Settlement", value=5)
+months_until_construction_start = st.sidebar.number_input("Months Until Construction Start after Settlement", value=6)
+construction_duration_months = st.sidebar.number_input("Construction Duration (Months)", value=9)
+
+# --- Advanced Settings ---
+with st.sidebar.expander("⚙️ Advanced Settings"):
     stamp_duty = st.number_input("Stamp Duty ($)", value=60405)
     legal_fees = st.number_input("Legal Fees ($)", value=2000)
-
-with st.sidebar.expander("🏗️ Construction Inputs"):
-    construction_size_m2 = st.number_input("Construction Size (m²)", value=300)
-    construction_cost_per_m2 = st.number_input("Construction Cost per m² ($)", value=2000)
     contingency_percent = st.slider("Contingency Percentage (%)", min_value=0.0, max_value=1.0, value=0.10)
     landscaping_cost = st.number_input("Landscaping Cost ($)", value=42500)
     connection_costs = st.number_input("Connection Costs ($)", value=14800)
@@ -26,34 +41,21 @@ with st.sidebar.expander("🏗️ Construction Inputs"):
     title_fees = st.number_input("Title Fees ($)", value=5000)
     asset_protection_bond = st.number_input("Asset Protection Bond ($)", value=2000)
     construction_insurance = st.number_input("Construction Insurance ($)", value=4000)
-
-with st.sidebar.expander("📄 Soft Costs"):
     survey_cost = st.number_input("Survey Cost ($)", value=2750)
     town_planning_cost = st.number_input("Town Planning Cost ($)", value=8800)
     working_drawings = st.number_input("Working Drawings ($)", value=7700)
     consultants_cost = st.number_input("Consultants Cost ($)", value=15000)
 
-with st.sidebar.expander("🏢 Sales Details"):
-    sale_price_per_unit = st.number_input("Sale Price per Unit ($)", value=750000)
-    number_of_units = st.number_input("Number of Units to Sell", value=2)
-
-with st.sidebar.expander("💰 Finance Details"):
-    deposit_percentage = st.slider("Deposit Percentage (%)", min_value=0.0, max_value=1.0, value=0.05)
-    land_loan_lvr = st.slider("Loan to Value Ratio (LVR)", min_value=0.0, max_value=1.0, value=0.80)
-    annual_interest_rate = st.number_input("Annual Interest Rate (%)", value=7.84) / 100
-    loan_term_years = st.number_input("Loan Term (Years)", value=30)
-
-with st.sidebar.expander("🗓️ Timeline"):
-    contract_signing_date = datetime(2025, 3, 1)
-    months_until_settlement = st.number_input("Months Until Settlement", value=5)
-    months_until_construction_start = st.number_input("Months Until Construction Start after Settlement", value=6)
-    construction_duration_months = st.number_input("Construction Duration (Months)", value=9)
-
-# --- Add Run Button ---
+# --- Buttons ---
 run_model = st.sidebar.button("Run Feasibility")
+reset_app = st.sidebar.button("Reset All Inputs")
+
+if reset_app:
+    st.experimental_rerun()
 
 if run_model:
     # --- Calculations ---
+    contract_signing_date = datetime(2025, 3, 1)
     construction_cost = construction_size_m2 * construction_cost_per_m2
     contingency = construction_cost * contingency_percent
     soft_costs_total = (survey_cost + town_planning_cost + working_drawings + consultants_cost +
@@ -74,6 +76,7 @@ if run_model:
 
     cash_outflow = 0
     loan_balance = 0
+    peak_cash_invested = 0
 
     for i in range(0, months_until_settlement + months_until_construction_start + construction_duration_months):
         date = contract_signing_date + relativedelta(months=i)
@@ -84,38 +87,64 @@ if run_model:
         if i > months_until_settlement + months_until_construction_start and (i - (months_until_settlement + months_until_construction_start)) % (construction_duration_months // 5) == 0:
             cash_outflow += (construction_cost * 0.30) / 5
             loan_balance += (construction_cost * 0.70) / 5
+        peak_cash_invested = max(peak_cash_invested, cash_outflow)
         data['Month Name'].append(month_label)
         data['Cumulative Cash Outflow ($)'].append(cash_outflow)
         data['Loan Balance ($)'].append(loan_balance)
 
     cashflow_df = pd.DataFrame(data)
 
+    cash_on_cash_roi = (gross_profit / peak_cash_invested) * 100 if peak_cash_invested else 0
+    profit_margin = (gross_profit / total_sale_value) * 100 if total_sale_value else 0
+
+    # --- Grading ---
+    if cash_on_cash_roi >= 80:
+        deal_grade = 'A+'
+        color = 'green'
+    elif 60 <= cash_on_cash_roi < 80:
+        deal_grade = 'A'
+        color = 'lightgreen'
+    elif 40 <= cash_on_cash_roi < 60:
+        deal_grade = 'B'
+        color = 'yellow'
+    elif 20 <= cash_on_cash_roi < 40:
+        deal_grade = 'C'
+        color = 'orange'
+    elif 0 <= cash_on_cash_roi < 20:
+        deal_grade = 'D'
+        color = 'red'
+    else:
+        deal_grade = 'F'
+        color = 'darkred'
+
     # --- Display Outputs ---
-    st.header("Summary")
+    st.header(f"Summary for {project_name}")
     st.write(f"Total Project Cost: ${total_project_cost:,.0f}")
     st.write(f"Total Sale Value: ${total_sale_value:,.0f}")
     st.write(f"Gross Profit: ${gross_profit:,.0f}")
     st.write(f"ROI on Total Cost: {roi_total_cost:.2f}%")
+    st.write(f"Cash-on-Cash ROI: {cash_on_cash_roi:.2f}%")
+    st.write(f"Profit Margin: {profit_margin:.2f}%")
+    st.write(f"Peak Cash Invested: ${peak_cash_invested:,.0f}")
+    st.markdown(f"### Deal Grade: <span style='color:{color}'>{deal_grade}</span>", unsafe_allow_html=True)
 
     st.header("Cashflow Table")
     st.dataframe(cashflow_df)
 
-    # --- Download Button for Cashflow ---
     st.download_button(
         label="📥 Download Cashflow CSV",
         data=cashflow_df.to_csv(index=False),
-        file_name='cashflow_table.csv',
+        file_name=f'{project_name.replace(" ", "_").lower()}_cashflow_table.csv',
         mime='text/csv'
     )
 
-    # --- Improved Graph Code ---
     st.header("Cashflow Graph")
     fig, ax = plt.subplots(figsize=(14,7))
     ax.plot(cashflow_df['Month Name'], cashflow_df['Cumulative Cash Outflow ($)'], label='Cumulative Cash Outflow ($)', marker='o')
     ax.plot(cashflow_df['Month Name'], cashflow_df['Loan Balance ($)'], label='Loan Balance ($)', marker='x')
     ax.set_xlabel('Month')
     ax.set_ylabel('Amount ($)')
-    ax.set_title('🔵 Project Cash Outflow and Loan Balance Over Time')
+    ax.set_title(f'🔵 Project Cash Outflow and Loan Balance Over Time: {project_name}')
     ax.grid(True)
     ax.legend()
     plt.xticks(rotation=45)
