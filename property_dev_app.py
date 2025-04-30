@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 
 st.title("🏗️ Property Development Feasibility App")
 
-# --- Sidebar Inputs ---
+# Sidebar Inputs
 st.sidebar.header("Project Info")
 project_name = st.sidebar.text_input("Project Name", value="My Project")
 
@@ -26,20 +26,23 @@ loan_on_construction_percent = st.sidebar.slider("Construction Loan Portion", 0.
 interest_rate = st.sidebar.number_input("Interest Rate (%)", value=6.5) / 100
 
 st.sidebar.header("Timeline")
-months_to_settlement = st.sidebar.number_input("Months to Settlement", value=3)
-months_to_start = st.sidebar.number_input("Months to Start Build (after settlement)", value=3)
+months_to_settlement = st.sidebar.number_input("Months Until Settlement", value=3)
+months_to_start = st.sidebar.number_input("Months Until Build Start (after settlement)", value=3)
 build_duration = st.sidebar.number_input("Build Duration (months)", value=9)
 draws = st.sidebar.number_input("Number of Draws", value=5, min_value=1)
 
-# --- Advanced Costs ---
+# Advanced Costs
 with st.sidebar.expander("⚙️ Advanced Costs"):
     contingency_percent = st.slider("Contingency on Construction (%)", 0.0, 0.3, 0.1)
     stamp_duty = st.number_input("Stamp Duty ($)", value=30000)
     legal_fees = st.number_input("Legal Fees ($)", value=3000)
+    survey = st.number_input("Survey ($)", value=2500)
+    town_planning = st.number_input("Town Planning ($)", value=4000)
+    permits = st.number_input("Permits ($)", value=4000)
     consultants = st.number_input("Consultants ($)", value=10000)
-    permits = st.number_input("Permits & Planning ($)", value=8000)
     insurance = st.number_input("Insurance & Bonds ($)", value=5000)
     connections = st.number_input("Utility Connections ($)", value=15000)
+    landscaping = st.number_input("Landscaping ($)", value=20000)
 
 if st.sidebar.button("🚀 Run Feasibility"):
     sale_value = sale_price * units
@@ -48,7 +51,6 @@ if st.sidebar.button("🚀 Run Feasibility"):
     total_construction_cost = construction_cost + contingency
     equity_land = land_price * (1 - land_lvr)
     loan_land = land_price * land_lvr
-    soft_costs = stamp_duty + legal_fees + consultants + permits + insurance + connections
 
     draw_amount = construction_cost / draws
     draw_months = [months_to_settlement + months_to_start + i * (build_duration // draws) for i in range(draws)]
@@ -71,9 +73,21 @@ if st.sidebar.button("🚀 Run Feasibility"):
         label = (datetime(2025, 3, 1) + relativedelta(months=m)).strftime("%b-%Y")
         cash = 0
         loan = 0
+
+        if m == 1:
+            cash += survey
         if m == months_to_settlement:
-            cash += equity_land + soft_costs
+            cash += equity_land + stamp_duty + legal_fees
             loan += loan_land
+        if m == months_to_settlement + 1:
+            cash += town_planning + permits
+        if m == months_to_settlement + months_to_start:
+            cash += insurance + consultants
+        if m == months_to_settlement + months_to_start + build_duration - 1:
+            cash += connections
+        if m == months_to_settlement + months_to_start + build_duration:
+            cash += landscaping
+
         if m in draw_months:
             cash += draw_amount * 0.3
             loan += draw_amount * 0.7
@@ -105,12 +119,17 @@ if st.sidebar.button("🚀 Run Feasibility"):
     elif roi_cash >= 20: grade, color = "C", "🟠"
     elif roi_cash > 0: grade, color = "D", "🔴"
 
+    st.subheader("💰 Cost Breakdown")
+    st.markdown(f"- **Land Purchase:** ${land_price:,.0f}")
+    st.markdown(f"- **Construction:** ${construction_cost:,.0f}")
+    st.markdown(f"- **Contingency:** ${contingency:,.0f}")
+    soft_cost_total = sum([stamp_duty, legal_fees, survey, town_planning, permits, consultants, insurance, connections, landscaping])
+    st.markdown(f"- **Soft Costs:** ${soft_cost_total:,.0f}")
+    st.markdown(f"- **Total Project Cost:** ${total_project_cost:,.0f}")
+
     st.subheader("📊 Feasibility Summary")
     st.markdown(f"**Project:** `{project_name}`")
     st.markdown(f"- **Total Sale Value:** ${sale_value:,.0f}")
-    st.markdown(f"- **Total Construction Cost (incl. contingency):** ${total_construction_cost:,.0f}")
-    st.markdown(f"- **Soft Costs:** ${soft_costs:,.0f}")
-    st.markdown(f"- **Total Project Cost:** ${total_project_cost:,.0f}")
     st.markdown(f"- **Gross Profit:** ${gross_profit:,.0f}")
     st.markdown(f"- **ROI on Total Cost:** {roi_total:.1f}%")
     st.markdown(f"- **Cash-on-Cash ROI:** {roi_cash:.1f}%")
