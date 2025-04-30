@@ -1,5 +1,5 @@
 
-# Final full MVP with per-unit staging, cashflow, summary, grading, and CSV
+# Final MVP: Feasibility App with Correct Total Project Cost Calculation
 
 import streamlit as st
 import pandas as pd
@@ -59,10 +59,10 @@ if st.button("🚀 Run Feasibility") and st.session_state.units:
         cost = u["size"] * u["rate"]
         cont = u["cont"] * cost
         total = cost + cont
-        monthly = total / u["duration"]
+        per_month = total / u["duration"]
         for m in range(u["start"], u["start"] + u["duration"]):
-            cash_months[m] = cash_months.get(m, 0) + monthly * 0.3
-            loan_months[m] = loan_months.get(m, 0) + monthly * 0.7
+            cash_months[m] = cash_months.get(m, 0) + per_month * 0.3
+            loan_months[m] = loan_months.get(m, 0) + per_month * 0.7
         sale_m = u["start"] + u["duration"] + 1
         cash_months[sale_m] = cash_months.get(sale_m, 0) - u["sale"]
 
@@ -88,14 +88,18 @@ if st.button("🚀 Run Feasibility") and st.session_state.units:
         cashflow["Net Cash Position ($)"].append(cum_cash - cum_loan)
 
     df = pd.DataFrame(cashflow)
-    last_sale_month = max([u["start"] + u["duration"] + 1 for u in st.session_state.units])
-    last_index = df[df["Month"] == last_sale_month].index[0]
-    total_cost = df["Cumulative Cash ($)"].iloc[last_index - 1] + df["Loan Balance ($)"].iloc[last_index - 1]
+
+    # ✅ NEW FIX: Use first unit's sale month to exclude proceeds from total cost
+    sale_months = [u["start"] + u["duration"] + 1 for u in st.session_state.units]
+    first_sale_month = min(sale_months)
+    first_sale_index = df[df["Month"] == first_sale_month].index[0]
+    total_project_cost = df["Cumulative Cash ($)"].iloc[first_sale_index - 1] + df["Loan Balance ($)"].iloc[first_sale_index - 1]
+
     total_sale = sum(u["sale"] for u in st.session_state.units)
-    profit = total_sale - total_cost
+    profit = total_sale - total_project_cost
     peak_cash = df["Cumulative Cash ($)"].max()
     roi_cash = (profit / peak_cash) * 100
-    roi_total = (profit / total_cost) * 100
+    roi_total = (profit / total_project_cost) * 100
 
     grade, color = "F", "🟥"
     if roi_cash >= 80: grade, color = "A+", "🟢"
@@ -106,7 +110,7 @@ if st.button("🚀 Run Feasibility") and st.session_state.units:
 
     st.subheader("📊 Summary")
     st.markdown(f"- **Total Sale Value:** ${total_sale:,.0f}")
-    st.markdown(f"- **Total Project Cost:** ${total_cost:,.0f}")
+    st.markdown(f"- **Total Project Cost:** ${total_project_cost:,.0f}")
     st.markdown(f"- **Gross Profit:** ${profit:,.0f}")
     st.markdown(f"- **ROI on Cost:** {roi_total:.1f}%")
     st.markdown(f"- **Cash-on-Cash ROI:** {roi_cash:.1f}%")
