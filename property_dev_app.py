@@ -106,7 +106,11 @@ if st.sidebar.button("🚀 Run Feasibility"):
 
     df = pd.DataFrame(cashflow)
 
-    total_project_cost = df["Cumulative Cash ($)"].iloc[-2] + df["Loan Balance ($)"].iloc[-2]
+    # FIX: calculate project cost BEFORE sale proceeds
+    sale_row = df[df["Month"] == sale_month]
+    sale_index = sale_row.index[0] if not sale_row.empty else len(df) - 1
+    total_project_cost = df["Cumulative Cash ($)"].iloc[sale_index - 1] + df["Loan Balance ($)"].iloc[sale_index - 1]
+
     gross_profit = sale_value - total_project_cost
     roi_total = (gross_profit / total_project_cost) * 100
     peak_cash = df["Cumulative Cash ($)"].max()
@@ -119,11 +123,12 @@ if st.sidebar.button("🚀 Run Feasibility"):
     elif roi_cash >= 20: grade, color = "C", "🟠"
     elif roi_cash > 0: grade, color = "D", "🔴"
 
+    soft_cost_total = sum([stamp_duty, legal_fees, survey, town_planning, permits, consultants, insurance, connections, landscaping])
+
     st.subheader("💰 Cost Breakdown")
     st.markdown(f"- **Land Purchase:** ${land_price:,.0f}")
     st.markdown(f"- **Construction:** ${construction_cost:,.0f}")
     st.markdown(f"- **Contingency:** ${contingency:,.0f}")
-    soft_cost_total = sum([stamp_duty, legal_fees, survey, town_planning, permits, consultants, insurance, connections, landscaping])
     st.markdown(f"- **Soft Costs:** ${soft_cost_total:,.0f}")
     st.markdown(f"- **Total Project Cost:** ${total_project_cost:,.0f}")
 
