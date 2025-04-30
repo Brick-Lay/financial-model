@@ -1,60 +1,68 @@
 
+# MVP: Property Development Feasibility App with Per-Unit Costing and Timeline Staging
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
-st.title("🏗️ Property Development Feasibility App")
+st.set_page_config(page_title="Feasibility Tool", layout="wide")
+st.title("🏗️ Multi-Unit Property Development Feasibility App")
 
-# Sidebar Inputs
-st.sidebar.header("Project Info")
-project_name = st.sidebar.text_input("Project Name", value="My Project")
+# --- Unit Manager ---
+if "units" not in st.session_state:
+    st.session_state.units = []
 
-st.sidebar.header("Land & Sales")
-land_price = st.sidebar.number_input("Land Price ($)", value=500000)
-sale_price = st.sidebar.number_input("Sale Price per Unit ($)", value=750000)
-units = st.sidebar.number_input("Number of Units", value=2)
+# --- Add Unit Form ---
+with st.expander("➕ Add New Unit"):
+    name = st.text_input("Unit Label (e.g. TH-01)")
+    build_size = st.number_input("Build Size (m²)", value=100)
+    cost_per_m2 = st.number_input("Cost per m² ($)", value=2000)
+    contingency_pct = st.slider("Contingency (%)", 0.0, 0.3, 0.1)
+    start_month = st.number_input("Start Month", value=0)
+    duration = st.number_input("Build Duration (months)", value=9)
+    sale_price = st.number_input("Sale Price ($)", value=750000)
+    if st.button("Add Unit"):
+        st.session_state.units.append({
+            "label": name,
+            "size": build_size,
+            "rate": cost_per_m2,
+            "contingency": contingency_pct,
+            "start": int(start_month),
+            "duration": int(duration),
+            "sale": sale_price
+        })
 
-st.sidebar.header("Construction")
-construction_size_m2 = st.sidebar.number_input("Build Size Total (m²)", value=200)
-construction_cost_per_m2 = st.sidebar.number_input("Construction Cost per m² ($)", value=2000)
+# --- Unit List ---
+st.subheader("📋 Project Units")
+if st.session_state.units:
+    for i, unit in enumerate(st.session_state.units):
+        with st.expander(f"{unit['label']}"):
+            st.markdown(f"**Build Size:** {unit['size']} m²")
+            st.markdown(f"**Rate:** ${unit['rate']:,.0f} /m²")
+            st.markdown(f"**Contingency:** {unit['contingency']*100:.1f}%")
+            st.markdown(f"**Start Month:** {unit['start']}")
+            st.markdown(f"**Duration:** {unit['duration']} months")
+            st.markdown(f"**Sale Price:** ${unit['sale']:,.0f}")
+            if st.button(f"❌ Remove {unit['label']}", key=f"rm_{i}"):
+                st.session_state.units.pop(i)
+                st.experimental_rerun()
+else:
+    st.info("Add at least one unit to begin.")
 
-st.sidebar.header("Finance")
+# --- Global Inputs ---
+st.sidebar.header("Global Project Settings")
+land_price = st.sidebar.number_input("Land Purchase Price ($)", value=500000)
 land_lvr = st.sidebar.slider("Land Loan LVR", 0.0, 1.0, 0.7)
-loan_on_construction_percent = st.sidebar.slider("Construction Loan Portion", 0.0, 1.0, 0.7)
 interest_rate = st.sidebar.number_input("Interest Rate (%)", value=6.5) / 100
+soft_costs = st.sidebar.number_input("Total Soft Costs ($)", value=80000)
+months_to_settlement = st.sidebar.number_input("Months to Land Settlement", value=3)
 
-st.sidebar.header("Timeline")
-months_to_settlement = st.sidebar.number_input("Months Until Settlement", value=3)
-months_to_start = st.sidebar.number_input("Months Until Build Start (after settlement)", value=3)
-build_duration = st.sidebar.number_input("Build Duration (months)", value=9)
-draws = st.sidebar.number_input("Number of Draws", value=5, min_value=1)
-
-# Advanced Costs
-with st.sidebar.expander("⚙️ Advanced Costs"):
-    contingency_percent = st.slider("Contingency on Construction (%)", 0.0, 0.3, 0.1)
-    stamp_duty = st.number_input("Stamp Duty ($)", value=30000)
-    legal_fees = st.number_input("Legal Fees ($)", value=3000)
-    survey = st.number_input("Survey ($)", value=2500)
-    town_planning = st.number_input("Town Planning ($)", value=4000)
-    permits = st.number_input("Permits ($)", value=4000)
-    consultants = st.number_input("Consultants ($)", value=10000)
-    insurance = st.number_input("Insurance & Bonds ($)", value=5000)
-    connections = st.number_input("Utility Connections ($)", value=15000)
-    landscaping = st.number_input("Landscaping ($)", value=20000)
-
-if st.sidebar.button("🚀 Run Feasibility"):
-    sale_value = sale_price * units
-    construction_cost = construction_cost_per_m2 * construction_size_m2
-    contingency = contingency_percent * construction_cost
-    total_construction_cost = construction_cost + contingency
-    equity_land = land_price * (1 - land_lvr)
-    loan_land = land_price * land_lvr
-
-    draw_amount = construction_cost / draws
-    draw_months = [months_to_settlement + months_to_start + i * (build_duration // draws) for i in range(draws)]
-    sale_month = months_to_settlement + months_to_start + build_duration + 1
+# --- Run Button ---
+if st.button("🚀 Run Feasibility") and st.session_state.units:
+    land_equity = land_price * (1 - land_lvr)
+    land_loan = land_price * land_lvr
 
     cashflow = {
         "Month": [],
@@ -66,55 +74,55 @@ if st.sidebar.button("🚀 Run Feasibility"):
         "Net Cash Position ($)": [],
     }
 
-    cash_cum = 0
-    loan_cum = 0
+    monthly_cash = {}
+    monthly_loan = {}
 
-    for m in range(sale_month + 2):
-        label = (datetime(2025, 3, 1) + relativedelta(months=m)).strftime("%b-%Y")
-        cash = 0
-        loan = 0
+    # Schedule land settlement + soft costs
+    monthly_cash[months_to_settlement] = land_equity + soft_costs
+    monthly_loan[months_to_settlement] = land_loan
 
-        if m == 1:
-            cash += survey
-        if m == months_to_settlement:
-            cash += equity_land + stamp_duty + legal_fees
-            loan += loan_land
-        if m == months_to_settlement + 1:
-            cash += town_planning + permits
-        if m == months_to_settlement + months_to_start:
-            cash += insurance + consultants
-        if m == months_to_settlement + months_to_start + build_duration - 1:
-            cash += connections
-        if m == months_to_settlement + months_to_start + build_duration:
-            cash += landscaping
+    for unit in st.session_state.units:
+        start = unit["start"]
+        end = start + unit["duration"]
+        total_cost = unit["size"] * unit["rate"]
+        contingency = unit["contingency"] * total_cost
+        total_with_contingency = total_cost + contingency
+        monthly_draw = total_cost / unit["duration"]
+        monthly_contingency = contingency / unit["duration"]
+        for m in range(start, end):
+            monthly_cash[m] = monthly_cash.get(m, 0) + (monthly_draw * 0.3 + monthly_contingency * 0.3)
+            monthly_loan[m] = monthly_loan.get(m, 0) + (monthly_draw * 0.7 + monthly_contingency * 0.7)
+        sale_month = end + 1
+        monthly_cash[sale_month] = monthly_cash.get(sale_month, 0) - unit["sale"]
 
-        if m in draw_months:
-            cash += draw_amount * 0.3
-            loan += draw_amount * 0.7
-        if m == sale_month:
-            cash -= sale_value
-
-        cash_cum += cash
-        loan_cum += loan
+    max_month = max(max(monthly_cash), max(monthly_loan))
+    cum_cash = cum_loan = 0
+    for m in range(max_month + 2):
+        date = datetime(2025, 3, 1) + relativedelta(months=m)
+        label = date.strftime("%b-%Y")
+        cash = monthly_cash.get(m, 0)
+        loan = monthly_loan.get(m, 0)
+        cum_cash += cash
+        cum_loan += loan
         cashflow["Month"].append(m)
         cashflow["Month Name"].append(label)
         cashflow["Cash Out ($)"].append(cash)
         cashflow["Loan In ($)"].append(loan)
-        cashflow["Cumulative Cash ($)"].append(cash_cum)
-        cashflow["Loan Balance ($)"].append(loan_cum)
-        cashflow["Net Cash Position ($)"].append(cash_cum - loan_cum)
+        cashflow["Cumulative Cash ($)"].append(cum_cash)
+        cashflow["Loan Balance ($)"].append(cum_loan)
+        cashflow["Net Cash Position ($)"].append(cum_cash - cum_loan)
 
     df = pd.DataFrame(cashflow)
 
-    # FIX: calculate project cost BEFORE sale proceeds
-    sale_row = df[df["Month"] == sale_month]
-    sale_index = sale_row.index[0] if not sale_row.empty else len(df) - 1
+    # Estimate total cost before any sale proceeds
+    sale_months = [unit["start"] + unit["duration"] + 1 for unit in st.session_state.units]
+    sale_index = min([df[df["Month"] == m].index[0] for m in sale_months if m in df["Month"].values])
     total_project_cost = df["Cumulative Cash ($)"].iloc[sale_index - 1] + df["Loan Balance ($)"].iloc[sale_index - 1]
-
-    gross_profit = sale_value - total_project_cost
-    roi_total = (gross_profit / total_project_cost) * 100
+    sale_total = sum([u["sale"] for u in st.session_state.units])
+    gross_profit = sale_total - total_project_cost
     peak_cash = df["Cumulative Cash ($)"].max()
     roi_cash = (gross_profit / peak_cash) * 100
+    roi_total = (gross_profit / total_project_cost) * 100
 
     grade, color = "F", "🟥"
     if roi_cash >= 80: grade, color = "A+", "🟢"
@@ -123,20 +131,13 @@ if st.sidebar.button("🚀 Run Feasibility"):
     elif roi_cash >= 20: grade, color = "C", "🟠"
     elif roi_cash > 0: grade, color = "D", "🔴"
 
-    soft_cost_total = sum([stamp_duty, legal_fees, survey, town_planning, permits, consultants, insurance, connections, landscaping])
-
-    st.subheader("💰 Cost Breakdown")
-    st.markdown(f"- **Land Purchase:** ${land_price:,.0f}")
-    st.markdown(f"- **Construction:** ${construction_cost:,.0f}")
-    st.markdown(f"- **Contingency:** ${contingency:,.0f}")
-    st.markdown(f"- **Soft Costs:** ${soft_cost_total:,.0f}")
+    st.subheader("📊 Financial Summary")
+    st.markdown(f"- **Land Cost:** ${land_price:,.0f}")
+    st.markdown(f"- **Soft Costs:** ${soft_costs:,.0f}")
+    st.markdown(f"- **Total Sale Value:** ${sale_total:,.0f}")
     st.markdown(f"- **Total Project Cost:** ${total_project_cost:,.0f}")
-
-    st.subheader("📊 Feasibility Summary")
-    st.markdown(f"**Project:** `{project_name}`")
-    st.markdown(f"- **Total Sale Value:** ${sale_value:,.0f}")
     st.markdown(f"- **Gross Profit:** ${gross_profit:,.0f}")
-    st.markdown(f"- **ROI on Total Cost:** {roi_total:.1f}%")
+    st.markdown(f"- **ROI on Cost:** {roi_total:.1f}%")
     st.markdown(f"- **Cash-on-Cash ROI:** {roi_cash:.1f}%")
     st.markdown(f"- **Peak Cash Invested:** ${peak_cash:,.0f}")
     st.markdown(f"- **Deal Grade:** `{grade}` {color}")
@@ -145,12 +146,12 @@ if st.sidebar.button("🚀 Run Feasibility"):
     fig, ax = plt.subplots(figsize=(14, 6))
     ax.plot(df["Month Name"], df["Cumulative Cash ($)"], label="Cash Invested", marker="o")
     ax.plot(df["Month Name"], df["Loan Balance ($)"], label="Loan Balance", marker="x")
-    ax.plot(df["Month Name"], df["Net Cash Position ($)"], label="Net Cash Position", linestyle="--", color="purple")
+    ax.plot(df["Month Name"], df["Net Cash Position ($)"], label="Net Cash", linestyle="--", color="purple")
     ax.set_xticks(df["Month Name"][::2])
     ax.set_xticklabels(df["Month Name"][::2], rotation=45)
-    ax.legend()
     ax.grid(True)
+    ax.legend()
     st.pyplot(fig)
 
     csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download Cashflow CSV", data=csv, file_name="cashflow.csv", mime="text/csv")
+    st.download_button("📥 Download Cashflow CSV", data=csv, file_name="multi_unit_cashflow.csv", mime="text/csv")
