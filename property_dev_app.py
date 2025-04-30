@@ -1,18 +1,114 @@
 
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 st.title("🏗️ Property Development Feasibility App")
 
-st.sidebar.header("Inputs")
+# Sidebar Inputs
+st.sidebar.header("Project Info")
 project_name = st.sidebar.text_input("Project Name", value="My Project")
 land_price = st.sidebar.number_input("Land Price ($)", value=500000)
 sale_price = st.sidebar.number_input("Sale Price per Unit ($)", value=750000)
 units = st.sidebar.number_input("Number of Units", value=2)
+build_cost_per_m2 = st.sidebar.number_input("Construction Cost per m² ($)", value=2000)
+build_size = st.sidebar.number_input("Total Construction Size (m²)", value=200)
+land_lvr = st.sidebar.slider("Land Loan LVR", 0.0, 1.0, 0.7)
+interest_rate = st.sidebar.number_input("Interest Rate (%)", value=6.5) / 100
+months_to_settlement = st.sidebar.number_input("Months to Settlement", value=3)
+months_to_start = st.sidebar.number_input("Months to Start Build (after settlement)", value=3)
+build_duration = st.sidebar.number_input("Build Duration (months)", value=9)
+draws = st.sidebar.number_input("Number of Draws", value=5, min_value=1)
 
 if st.sidebar.button("🚀 Run Feasibility"):
-    total_sale = sale_price * units
-    st.subheader("📊 Summary")
-    st.markdown(f"**Project Name:** {project_name}")
-    st.markdown(f"**Land Purchase Price:** ${land_price:,.0f}")
-    st.markdown(f"**Sale Value:** ${total_sale:,.0f}")
+    build_cost = build_cost_per_m2 * build_size
+    sale_value = sale_price * units
+    equity_land = land_price * (1 - land_lvr)
+    loan_land = land_price * land_lvr
+
+    draw_amount = build_cost / draws
+    draw_months = [months_to_settlement + months_to_start + i * (build_duration // draws) for i in range(draws)]
+    sale_month = months_to_settlement + months_to_start + build_duration + 1
+
+    cashflow = {
+        "Month": [],
+        "Month Name": [],
+        "Cash Out ($)": [],
+        "Loan In ($)": [],
+        "Cumulative Cash ($)": [],
+        "Loan Balance ($)": [],
+        "Net Cash Position ($)": [],
+    }
+
+    cash_cum = 0
+    loan_cum = 0
+
+    for m in range(sale_month + 2):
+        label = (datetime(2025, 3, 1) + relativedelta(months=m)).strftime("%b-%Y")
+        cash = 0
+        loan = 0
+        if m == months_to_settlement:
+            cash += equity_land
+            loan += loan_land
+        if m in draw_months:
+            cash += draw_amount * 0.3
+            loan += draw_amount * 0.7
+        if m == sale_month:
+            cash -= sale_value
+
+        cash_cum += cash
+        loan_cum += loan
+        cashflow["Month"].append(m)
+        cashflow["Month Name"].append(label)
+        cashflow["Cash Out ($)"].append(cash)
+        cashflow["Loan In ($)"].append(loan)
+        cashflow["Cumulative Cash ($)"].append(cash_cum)
+        cashflow["Loan Balance ($)"].append(loan_cum)
+        cashflow["Net Cash Position ($)"].append(cash_cum - loan_cum)
+
+    df = pd.DataFrame(cashflow)
+
+    total_cost = df["Cumulative Cash ($)"].iloc[-2] + df["Loan Balance ($)"].iloc[-2]
+    profit = sale_value - total_cost
+    peak_cash = df["Cumulative Cash ($)"].max()
+    roi_total = (profit / total_cost) * 100
+    roi_cash = (profit / peak_cash) * 100
+
+    grade = "F"
+    color = "🟥"
+    if roi_cash >= 80:
+        grade, color = "A+", "🟢"
+    elif roi_cash >= 60:
+        grade, color = "A", "🟢"
+    elif roi_cash >= 40:
+        grade, color = "B", "🟡"
+    elif roi_cash >= 20:
+        grade, color = "C", "🟠"
+    elif roi_cash > 0:
+        grade, color = "D", "🔴"
+
+    st.subheader("📊 Feasibility Summary")
+    st.markdown(f"**Project:** `{project_name}`")
+    st.markdown(f"- **Sale Value:** ${sale_value:,.0f}")
+    st.markdown(f"- **Total Project Cost:** ${total_cost:,.0f}")
+    st.markdown(f"- **Gross Profit:** ${profit:,.0f}")
+    st.markdown(f"- **ROI on Total Cost:** {roi_total:.1f}%")
+    st.markdown(f"- **Cash-on-Cash ROI:** {roi_cash:.1f}%")
+    st.markdown(f"- **Peak Cash Invested:** ${peak_cash:,.0f}")
+    st.markdown(f"- **Deal Grade:** `{grade}` {color}")
+
+    st.subheader("📈 Cashflow Overview")
+    fig, ax = plt.subplots(figsize=(14, 6))
+    ax.plot(df["Month Name"], df["Cumulative Cash ($)"], label="Cash Invested", marker="o")
+    ax.plot(df["Month Name"], df["Loan Balance ($)"], label="Loan Balance", marker="x")
+    ax.plot(df["Month Name"], df["Net Cash Position ($)"], label="Net Cash Position", linestyle="--", color="purple")
+    ax.set_xticks(df["Month Name"][::2])
+    ax.set_xticklabels(df["Month Name"][::2], rotation=45)
+    ax.legend()
+    ax.grid(True)
+    st.pyplot(fig)
+
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button("📥 Download Cashflow CSV", data=csv, file_name="cashflow.csv", mime="text/csv")
